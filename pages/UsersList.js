@@ -1,51 +1,73 @@
-import React, { useState, useEffect } from "react";
-import { View, ScrollView, StyleSheet, TextInput, Button, SafeAreaView } from "react-native";
+import React, { useState } from "react";
+import {
+  ScrollView,
+  StyleSheet,
+  TextInput,
+  Button,
+  SafeAreaView,
+  View,
+  Dimensions,
+} from "react-native";
 import { ListItem, Avatar } from "react-native-elements";
 import { useNavigation } from "@react-navigation/native";
+import { BarChart } from "react-native-chart-kit";
+
+/**Components */
+import ShowErrors from "./components/ShowErrors";
 
 const UsersList = () => {
   const [inputValue, setInputValue] = useState({ user: "" });
   const [searchResults, setSearchResults] = useState([]);
   const navigation = useNavigation();
+  const [chartData, setChartData] = useState([]);
+  const [errors, setErrors] = useState([]);
+  const [showErrors, setShowErrors] = useState(false);
 
-  const fetchAllUsers = async () => {
-    try {
-      const res = await fetch("https://api.github.com/users");
-      const data = await res.json();
-      setSearchResults(data.slice(0, 10));
-    } catch (error) {
-      console.error(error);
-    }
-  };
+  const urlApiGithubSearch = 'https://api.github.com/search/users';  
 
   const fetchUser = async () => {
     const searchTerm = inputValue.user.trim();
-
-    if (!searchTerm) {
-      fetchAllUsers()
-        return;
-    }
-
+  
     if (searchTerm.length < 4) {
-      alert('El texto de búsqueda debe tener al menos 4 caracteres.');
+      setErrors(["El texto de búsqueda debe tener al menos 4 caracteres."]);
+      setShowErrors(true);
       return;
     }
-
-    if (searchTerm.toLowerCase() === 'doublevpartners') {
-      alert('La búsqueda de "doublevpartners" no está permitida.');
+  
+    if (searchTerm.toLowerCase() === "doublevpartners") {
+      setErrors(["La búsqueda de doublevpartners no está permitida."]);
+      setShowErrors(true);
       return;
     }
-
+  
     try {
-      const res = await fetch(
-        `https://api.github.com/search/users?q=${inputValue.user}`
-      );
+      const res = await fetch(`${urlApiGithubSearch}?q=${inputValue.user}`);
       const data = await res.json();
-      setSearchResults(data.items.slice(0, 10));
+      if (data.items.length === 0) {
+        setErrors(["Usuario no encontrado. Intente con otro nombre de usuario."]);
+        setShowErrors(true);
+      } else {
+        setSearchResults(data.items.slice(0, 10));
+        
+        const followersUrls = data.items.slice(0, 10).map((user) => user.followers_url);
+        
+        const followersCounts = await Promise.all(
+          followersUrls.map(async (followersUrl) => {
+            const followersRes = await fetch(followersUrl);
+            const followersData = await followersRes.json();
+            return followersData.length;
+          })
+        );
+        
+        setChartData(followersCounts);
+      }
     } catch (error) {
       console.error(error);
+      setErrors(["Hubo un error al buscar usuarios. Por favor, inténtelo de nuevo."]);
+      setShowErrors(true);
     }
   };
+  
 
   const navigateToUserProfile = (user) => {
     navigation.navigate("UserProfile", {
@@ -55,9 +77,11 @@ const UsersList = () => {
     });
   };
 
-  useEffect(() => {
-    fetchAllUsers();
-  }, []);
+  const labels = searchResults.map((user) => {
+    const truncatedName = user.login.length > 4 ? user.login.slice(0, 4) + "..." : user.login;
+    return truncatedName;
+  });
+  
 
   return (
     <ScrollView>
@@ -71,7 +95,11 @@ const UsersList = () => {
       </SafeAreaView>
 
       {searchResults.map((user) => (
-        <ListItem key={user.id} bottomDivider onPress={() => navigateToUserProfile(user)}>
+        <ListItem
+          key={user.id}
+          bottomDivider
+          onPress={() => navigateToUserProfile(user)}
+        >
           <Avatar source={{ uri: user.avatar_url }} rounded size="medium" />
           <ListItem.Content>
             <ListItem.Title>{user.login}</ListItem.Title>
@@ -79,6 +107,42 @@ const UsersList = () => {
           </ListItem.Content>
         </ListItem>
       ))}
+
+      {searchResults.length > 1 && (
+        <View style={{ flex: 1 }}>
+          <BarChart
+            data={{
+              labels,
+              datasets: [
+                {
+                  data: chartData,
+                },
+              ],
+            }}
+            width={Dimensions.get("window").width}
+            height={200}
+            yAxisInterval={1}
+            chartConfig={{
+              backgroundGradientFrom: "#ffffff",
+              backgroundGradientTo: "#ffffff",
+              decimalPlaces: 0,
+              color: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
+              labelColor: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
+              barPercentage: 0.5
+            }}
+          />
+        </View>
+      )}
+
+      {showErrors && (
+        <ShowErrors
+          errors={errors}
+          onClose={() => {
+            setShowErrors(false);
+            setErrors([]);
+          }}
+        />
+      )}
     </ScrollView>
   );
 };
@@ -98,7 +162,7 @@ const styles = StyleSheet.create({
     margin: 12,
     borderWidth: 1,
     padding: 10,
-    borderRadius: 8
+    borderRadius: 8,
   },
 
   buttonContainer: {
