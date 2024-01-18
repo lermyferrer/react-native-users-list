@@ -10,8 +10,8 @@ const Stack = createNativeStackNavigator();
 function MyStack() {
   return (
     <Stack.Navigator>
-      <Stack.Screen name="UsersList" component={UsersList} />
-      <Stack.Screen name="UserProfile" component={UserProfile} />
+      <Stack.Screen options={{ title: "Lista de usuarios" }} name="UsersList" component={UsersList} />
+      <Stack.Screen options={{ title: "Perfil del usuario" }} name="UserProfile" component={UserProfile} />
     </Stack.Navigator>
   );
 }
