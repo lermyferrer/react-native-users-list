@@ -22,5 +22,5 @@ Aplicación realizada con React Native utilizando Expo para aplicaciones React u
 npm install
 
 ```bash
-npm npm run dev
+npm npx expo start
 
